@@ -1,6 +1,8 @@
 # A2UI 기술 소개 및 MVP 구현 사례
 
 > AI 에이전트가 안전하게 UI를 생성하는 선언적 JSON 프로토콜
+>
+> 본 문서는 [A2UI v0.9 Specification](https://a2ui.org/specification/v0.9-a2ui/)을 기반으로 작성되었습니다.
 
 ---
 
@@ -10,10 +12,12 @@
 
 **A2UI (Agent-to-UI)**는 Google에서 개발한 오픈 프로토콜로, AI 에이전트가 **선언적 JSON**을 통해 동적으로 UI를 생성하고 제어할 수 있게 합니다.
 
-- **공식 사이트**: [https://a2ui.org/](https://a2ui.org/)
-- **GitHub**: [https://github.com/google/A2UI](https://github.com/google/A2UI)
-- **현재 버전**: v0.9
-- **발표**: 2024년 Google I/O
+| 항목 | 내용 |
+|------|------|
+| 공식 사이트 | [https://a2ui.org/](https://a2ui.org/) |
+| GitHub | [https://github.com/google/A2UI](https://github.com/google/A2UI) |
+| 현재 버전 | v0.9 |
+| 발표 | 2024년 Google I/O |
 
 ### 탄생 배경: AI UI의 딜레마
 
@@ -21,603 +25,379 @@ AI 에이전트 시대가 도래하면서 새로운 문제가 등장했습니다
 
 > **"AI가 텍스트뿐 아니라 풍부한 UI도 생성할 수 있다면 얼마나 좋을까?"**
 
-하지만 기존 방식들은 모두 한계가 있었습니다:
+기존 방식들의 한계:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    AI가 UI를 생성하는 기존 방식들                         │
-├──────────────────────┬──────────────────────────────────────────────────┤
-│                      │                                                  │
-│  1. 코드 직접 생성    │  AI가 HTML/React/Vue 코드를 직접 생성            │
-│                      │  ❌ 보안 위험: XSS, 악성 스크립트 실행 가능       │
-│                      │  ❌ 신뢰할 수 없는 코드 실행                      │
-│                      │                                                  │
-├──────────────────────┼──────────────────────────────────────────────────┤
-│                      │                                                  │
-│  2. 고정 템플릿      │  미리 정의된 UI 템플릿만 선택                     │
-│                      │  ❌ 유연성 부족                                   │
-│                      │  ❌ AI의 창의성 제한                              │
-│                      │  ❌ 새로운 UI 패턴 추가 어려움                    │
-│                      │                                                  │
-├──────────────────────┼──────────────────────────────────────────────────┤
-│                      │                                                  │
-│  3. Function Calling │  AI가 함수를 호출하고 결과를 표시                 │
-│                      │  ⚠️ UI 생성이 아닌 데이터 조회에 적합             │
-│                      │  ⚠️ 복잡한 UI 구조 표현 어려움                    │
-│                      │                                                  │
-└──────────────────────┴──────────────────────────────────────────────────┘
-```
+| 방식 | 설명 | 문제점 |
+|------|------|--------|
+| 코드 직접 생성 | AI가 HTML/React 코드 생성 | 보안 위험 (XSS, 악성 스크립트) |
+| 고정 템플릿 | 미리 정의된 UI 선택 | 유연성 부족, AI 창의성 제한 |
+| Function Calling | 함수 호출 후 결과 표시 | UI 표현력 제한, 복잡한 구조 어려움 |
 
 ### A2UI의 해결책: 선언적 UI 프로토콜
 
 A2UI는 이 딜레마를 **"선언적 JSON"**으로 해결합니다:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                                                                         │
-│   AI가 생성하는 것:        실행되지 않는 "데이터"                         │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │  {                                                              │  │
-│   │    "type": "Button",                                            │  │
-│   │    "label": "주문하기",          ← 무엇을 표시할지 "선언"만 함   │  │
-│   │    "action": { "actionId": "order" }                            │  │
-│   │  }                                                              │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-│   렌더러가 하는 것:        안전하게 검증된 컴포넌트로 변환                │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │  <button onClick={handleAction}>주문하기</button>               │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph AI["AI (LLM)"]
+        JSON["{ type: Button, label: 주문하기 }"]
+    end
+
+    subgraph Renderer["신뢰할 수 있는 렌더러"]
+        UI["&lt;button&gt;주문하기&lt;/button&gt;"]
+    end
+
+    JSON -->|"선언적 데이터만 전송"| UI
+
+    style AI fill:#fff3cd
+    style Renderer fill:#d4edda
 ```
 
 **핵심 아이디어**: AI는 "무엇을 보여줄지"만 선언하고, "어떻게 보여줄지"는 신뢰할 수 있는 렌더러가 담당
 
 ---
 
-## 2. A2UI 설계 철학
+## 2. A2UI 설계 철학 (v0.9)
 
-### 핵심 원칙 5가지
+### 핵심 원칙
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        A2UI 설계 원칙                                    │
-├───────────────────┬─────────────────────────────────────────────────────┤
-│                   │                                                     │
-│  1. Security      │  실행 가능한 코드가 아닌 선언적 데이터만 전송       │
-│     First         │  → 악성 코드 실행 원천 차단                         │
-│                   │  → XSS, 인젝션 공격 불가능                          │
-│                   │                                                     │
-├───────────────────┼─────────────────────────────────────────────────────┤
-│                   │                                                     │
-│  2. LLM           │  평탄한 JSON 구조 (깊은 중첩 최소화)                │
-│     Friendly      │  → LLM이 생성하기 쉬운 형태                         │
-│                   │  → 토큰 효율성 고려                                 │
-│                   │  → 스트리밍 친화적 (JSONL 지원)                     │
-│                   │                                                     │
-├───────────────────┼─────────────────────────────────────────────────────┤
-│                   │                                                     │
-│  3. Platform      │  동일한 JSON → React, Flutter, Swift 등            │
-│     Agnostic      │  → 한 번 정의, 어디서든 렌더링                      │
-│                   │  → 프레임워크 종속성 없음                           │
-│                   │                                                     │
-├───────────────────┼─────────────────────────────────────────────────────┤
-│                   │                                                     │
-│  4. Incremental   │  전체 UI를 한 번에 보내지 않음                      │
-│     Updates       │  → 변경된 부분만 업데이트                           │
-│                   │  → 효율적인 네트워크 사용                           │
-│                   │  → 실시간 UI 업데이트 가능                          │
-│                   │                                                     │
-├───────────────────┼─────────────────────────────────────────────────────┤
-│                   │                                                     │
-│  5. Bidirectional │  UI → 사용자 입력 → AI → UI 업데이트                │
-│     Communication │  → Action 시스템으로 사용자 상호작용 전달           │
-│                   │  → 양방향 데이터 바인딩                             │
-│                   │                                                     │
-└───────────────────┴─────────────────────────────────────────────────────┘
-```
+| 원칙 | 설명 |
+|------|------|
+| **Security First** | 실행 가능한 코드가 아닌 선언적 데이터만 전송 → 악성 코드 실행 원천 차단 |
+| **LLM Friendly** | 평탄한 JSON 구조, 깊은 중첩 최소화 → 토큰 효율성, 스트리밍 지원 |
+| **Platform Agnostic** | 동일한 JSON → React, Flutter, Swift 등 어디서든 렌더링 |
+| **Incremental Updates** | 전체 UI가 아닌 변경된 부분만 업데이트 → 효율적 네트워크 사용 |
+| **Bidirectional** | UI ↔ 사용자 입력 ↔ AI 양방향 통신, Action 시스템 내장 |
 
 ### 왜 "선언적(Declarative)"인가?
 
-```
-명령형 (Imperative) - 기존 방식
-─────────────────────────────────
-"버튼 요소를 만들어라"
-"클릭 이벤트 리스너를 붙여라"
-"스타일을 적용하라"
-"DOM에 추가하라"
-
-→ 각 단계가 실행 가능한 "명령"
-→ 악성 코드가 숨어들 수 있음
-
-
-선언적 (Declarative) - A2UI 방식
-─────────────────────────────────
-"버튼이 있다. 라벨은 '주문하기'이다."
-
-→ 상태를 "설명"만 함
-→ 실제 생성은 신뢰할 수 있는 렌더러가 수행
-→ 안전성 보장
-```
+| 구분 | 명령형 (Imperative) | 선언적 (Declarative) |
+|------|---------------------|----------------------|
+| 방식 | "버튼을 만들어라, 이벤트를 붙여라" | "버튼이 있다. 라벨은 '주문하기'이다" |
+| 특징 | 각 단계가 실행 가능한 "명령" | 상태를 "설명"만 함 |
+| 보안 | 악성 코드가 숨어들 수 있음 | 실제 생성은 신뢰된 렌더러가 수행 |
 
 ---
 
-## 3. 다른 기술과의 비교
-
-### AI UI 생성 기술 비교
-
-| 기술 | 설명 | 장점 | 단점 |
-|------|------|------|------|
-| **A2UI** | 선언적 JSON 프로토콜 | 안전 + 유연 + 표준화 | 렌더러 구현 필요 |
-| **Function Calling** | AI가 함수 호출 | 기존 API 활용 | UI 표현력 제한 |
-| **Structured Output** | 스키마 기반 JSON | 타입 안정성 | UI 특화 아님 |
-| **코드 생성** | HTML/React 코드 | 최대 유연성 | 보안 위험 |
-| **고정 템플릿** | 미리 정의된 UI | 안전성 보장 | 유연성 없음 |
-
-### Function Calling vs A2UI
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Function Calling                                                       │
-│  ─────────────────                                                      │
-│  AI: "get_weather 함수를 호출합니다"                                    │
-│       ↓                                                                 │
-│  시스템: { "temp": 25, "condition": "sunny" }                          │
-│       ↓                                                                 │
-│  AI: "오늘 날씨는 25도이고 맑습니다"                                    │
-│                                                                         │
-│  → 데이터 조회에 적합                                                   │
-│  → UI는 개발자가 하드코딩해야 함                                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│  A2UI                                                                   │
-│  ─────                                                                  │
-│  AI: A2UI JSON 생성                                                     │
-│       ↓                                                                 │
-│  {                                                                      │
-│    "type": "Card",                                                      │
-│    "childIds": ["icon", "temp", "condition"],                          │
-│    ...                                                                  │
-│  }                                                                      │
-│       ↓                                                                 │
-│  렌더러: 날씨 카드 UI 표시                                              │
-│                                                                         │
-│  → AI가 직접 UI 구조 결정                                               │
-│  → 상황에 맞는 동적 UI 생성                                             │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### OpenAI Structured Outputs vs A2UI
-
-| 관점 | Structured Outputs | A2UI |
-|------|-------------------|------|
-| 목적 | 일반적인 JSON 스키마 준수 | UI 생성 특화 |
-| 컴포넌트 | 없음 (직접 정의) | 18개 표준 컴포넌트 |
-| 상호작용 | 없음 | Action 시스템 내장 |
-| 데이터 바인딩 | 없음 | JSON Pointer 기반 |
-| 렌더러 | 없음 | 공식 라이브러리 제공 |
-
-**결론**: Structured Outputs는 범용 도구, A2UI는 UI 생성에 특화된 프로토콜
-
----
-
-## 4. A2UI 보안 모델
-
-### 보안 위협과 대응
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         A2UI 보안 모델                                   │
-├───────────────────────┬─────────────────────────────────────────────────┤
-│                       │                                                 │
-│  XSS (Cross-Site      │  ✅ 차단됨                                      │
-│  Scripting)           │  → AI가 <script> 태그를 생성할 수 없음          │
-│                       │  → 모든 텍스트는 이스케이프 처리됨              │
-│                       │                                                 │
-├───────────────────────┼─────────────────────────────────────────────────┤
-│                       │                                                 │
-│  코드 인젝션          │  ✅ 차단됨                                      │
-│                       │  → 실행 가능한 코드 전송 불가                   │
-│                       │  → JSON 데이터만 허용                           │
-│                       │                                                 │
-├───────────────────────┼─────────────────────────────────────────────────┤
-│                       │                                                 │
-│  무한 루프/리소스     │  ✅ 렌더러에서 제어                             │
-│  고갈                 │  → 컴포넌트 수 제한 가능                        │
-│                       │  → 중첩 깊이 제한 가능                          │
-│                       │                                                 │
-├───────────────────────┼─────────────────────────────────────────────────┤
-│                       │                                                 │
-│  민감 정보 노출       │  ⚠️ 애플리케이션 레벨에서 처리                  │
-│                       │  → AI 프롬프트에서 민감 정보 필터링             │
-│                       │  → A2UI 자체 범위 외                            │
-│                       │                                                 │
-└───────────────────────┴─────────────────────────────────────────────────┘
-```
+## 3. A2UI 보안 모델
 
 ### 신뢰 경계 (Trust Boundary)
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                                                                  │
-│     신뢰할 수 없는 영역              신뢰할 수 있는 영역          │
-│     (Untrusted)                     (Trusted)                   │
-│                                                                  │
-│  ┌─────────────────┐          ┌─────────────────────────────┐   │
-│  │                 │          │                             │   │
-│  │   AI / LLM      │   JSON   │      A2UI 렌더러            │   │
-│  │                 │ ───────▶ │                             │   │
-│  │  (외부, 제어    │   only   │  (내부, 검증된 코드)        │   │
-│  │   불가능)       │          │                             │   │
-│  │                 │          │  - 컴포넌트 화이트리스트    │   │
-│  └─────────────────┘          │  - 속성 검증                │   │
-│                               │  - 안전한 렌더링            │   │
-│                               │                             │   │
-│                               └─────────────────────────────┘   │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Untrusted["신뢰할 수 없는 영역"]
+        AI["AI / LLM"]
+    end
+
+    subgraph Trusted["신뢰할 수 있는 영역"]
+        Renderer["A2UI 렌더러"]
+        Whitelist["컴포넌트 화이트리스트"]
+        Validation["속성 검증"]
+        Safe["안전한 렌더링"]
+    end
+
+    AI -->|"JSON only"| Renderer
+    Renderer --> Whitelist
+    Renderer --> Validation
+    Renderer --> Safe
+
+    style Untrusted fill:#f8d7da
+    style Trusted fill:#d4edda
 ```
 
 **핵심**: AI가 무엇을 생성하든, 렌더러의 화이트리스트에 있는 컴포넌트만 렌더링됨
 
+### 보안 위협 대응
+
+| 위협 | 상태 | 대응 |
+|------|------|------|
+| XSS (Cross-Site Scripting) | ✅ 차단 | AI가 `<script>` 태그 생성 불가, 모든 텍스트 이스케이프 |
+| 코드 인젝션 | ✅ 차단 | 실행 가능한 코드 전송 불가, JSON 데이터만 허용 |
+| 무한 루프/리소스 고갈 | ✅ 렌더러 제어 | 컴포넌트 수/중첩 깊이 제한 가능 |
+| 민감 정보 노출 | ⚠️ 앱 레벨 | AI 프롬프트에서 필터링 (A2UI 범위 외) |
+
 ---
 
-## 5. A2UI 아키텍처 상세
+## 4. A2UI 프로토콜 아키텍처 (v0.9)
 
 ### 전체 통신 흐름
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        A2UI 통신 흐름                                    │
-│                                                                         │
-│   ┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐   │
-│   │          │      │          │      │          │      │          │   │
-│   │  사용자   │      │   App    │      │    AI    │      │  렌더러   │   │
-│   │          │      │  Server  │      │   (LLM)  │      │          │   │
-│   └────┬─────┘      └────┬─────┘      └────┬─────┘      └────┬─────┘   │
-│        │                 │                 │                 │         │
-│        │  "쿠키 보여줘"  │                 │                 │         │
-│        │────────────────▶│                 │                 │         │
-│        │                 │                 │                 │         │
-│        │                 │  프롬프트 전송   │                 │         │
-│        │                 │────────────────▶│                 │         │
-│        │                 │                 │                 │         │
-│        │                 │                 │  A2UI JSON 생성 │         │
-│        │                 │                 │ ─ ─ ─ ─ ─ ─ ─ ▶│         │
-│        │                 │                 │                 │         │
-│        │                 │   A2UI JSON     │                 │         │
-│        │                 │◀────────────────│                 │         │
-│        │                 │                 │                 │         │
-│        │                 │                 │   JSON 전달     │         │
-│        │                 │─────────────────────────────────▶│         │
-│        │                 │                 │                 │         │
-│        │                 │                 │                 │  UI     │
-│        │◀───────────────────────────────────────────────────│  렌더링 │
-│        │                 │                 │                 │         │
-│        │  [버튼 클릭]    │                 │                 │         │
-│        │────────────────▶│                 │                 │         │
-│        │                 │                 │                 │         │
-│        │                 │  Action + 컨텍스트                │         │
-│        │                 │────────────────▶│                 │         │
-│        │                 │                 │                 │         │
-│        │                 │  새 A2UI JSON   │                 │         │
-│        │                 │◀────────────────│                 │         │
-│        │                 │                 │                 │         │
-│        ▼                 ▼                 ▼                 ▼         │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant User as 사용자
+    participant App as App Server
+    participant AI as AI (LLM)
+    participant Renderer as A2UI 렌더러
+
+    User->>App: "쿠키 보여줘"
+    App->>AI: 프롬프트 전송
+    AI->>AI: A2UI JSON 생성
+    AI->>App: A2UI JSON 응답
+    App->>Renderer: JSON 전달
+    Renderer->>User: UI 렌더링
+
+    User->>Renderer: [버튼 클릭]
+    Renderer->>App: Action + Context
+    App->>AI: Action 포함 프롬프트
+    AI->>App: 새 A2UI JSON
+    App->>Renderer: JSON 전달
+    Renderer->>User: UI 업데이트
 ```
 
-### Surface: 독립적인 UI 컨테이너
+### Server-to-Client 메시지 타입 (5가지)
 
-**Surface**는 A2UI의 핵심 개념으로, 독립적으로 관리되는 UI 영역입니다.
+v0.9 스펙에 정의된 서버→클라이언트 메시지:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Surface 개념                                   │
-│                                                                         │
-│   하나의 애플리케이션에 여러 Surface가 공존할 수 있음                    │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │  Application                                                    │   │
-│   │                                                                 │   │
-│   │   ┌─────────────────┐  ┌─────────────────┐  ┌───────────────┐  │   │
-│   │   │ Surface A       │  │ Surface B       │  │ Surface C     │  │   │
-│   │   │ "product-list"  │  │ "shopping-cart" │  │ "user-profile"│  │   │
-│   │   │                 │  │                 │  │               │  │   │
-│   │   │ ┌───┐ ┌───┐     │  │ ┌───────────┐  │  │ ┌───────────┐ │  │   │
-│   │   │ │   │ │   │     │  │ │ 장바구니   │  │  │ │ 프로필    │ │  │   │
-│   │   │ └───┘ └───┘     │  │ │           │  │  │ │           │ │  │   │
-│   │   │ 상품1  상품2     │  │ └───────────┘  │  │ └───────────┘ │  │   │
-│   │   │                 │  │                 │  │               │  │   │
-│   │   │ DataModel:      │  │ DataModel:      │  │ DataModel:    │  │   │
-│   │   │ {products:[...]}│  │ {items:[...]}   │  │ {user:{...}}  │  │   │
-│   │   └─────────────────┘  └─────────────────┘  └───────────────┘  │   │
-│   │                                                                 │   │
-│   └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-│   각 Surface는:                                                         │
-│   • 고유한 surfaceId를 가짐                                             │
-│   • 독립적인 컴포넌트 트리 보유                                         │
-│   • 독립적인 DataModel 보유                                             │
-│   • 개별적으로 생성/업데이트/삭제 가능                                  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| 메시지 타입 | 용도 | 필수 필드 |
+|-------------|------|-----------|
+| `createSurface` | Surface 초기화 | `surfaceId`, `catalogId` |
+| `updateComponents` | 컴포넌트 정의/수정 | `surfaceId`, `components` |
+| `updateDataModel` | 데이터 모델 설정/수정 | `surfaceId`, `actorId`, `updates`, `versions` |
+| `deleteSurface` | Surface 삭제 | `surfaceId` |
+| `watchDataModel` | 클라이언트→서버 동기화 설정 | `surfaceId`, 경로별 모드 (`onAction`/`onChanged`) |
 
-### 메시지 타입 상세
+### Client-to-Server 메시지 타입 (3가지)
 
-| 메시지 타입 | 용도 | 필수 필드 | 설명 |
-|------------|------|-----------|------|
-| `createSurface` | Surface 생성 | `surfaceId` | 새로운 UI 영역 초기화 |
-| `updateComponents` | 컴포넌트 정의 | `surfaceId`, `components` | UI 구조 정의/수정 |
-| `updateDataModel` | 데이터 설정 | `surfaceId`, `dataModel` | 바인딩할 데이터 설정 |
-| `deleteSurface` | Surface 삭제 | `surfaceId` | UI 영역 제거 |
-
-### 컴포넌트 트리 구조
-
-A2UI는 **평탄한 배열**로 트리를 표현합니다 (LLM 친화적):
-
-```json
-// 중첩 구조 (비권장 - LLM이 생성하기 어려움)
-{
-  "type": "Column",
-  "children": [
-    {
-      "type": "Text",
-      "children": [...]
-    }
-  ]
-}
-
-// A2UI 평탄 구조 (권장)
-{
-  "components": [
-    { "id": "root", "type": "Column", "childIds": ["text1", "text2"] },
-    { "id": "text1", "type": "Text", "text": "Hello" },
-    { "id": "text2", "type": "Text", "text": "World" }
-  ]
-}
-```
-
-**장점**:
-- LLM이 생성하기 쉬움 (깊은 중첩 없음)
-- 개별 컴포넌트 업데이트 용이
-- ID 기반 참조로 재사용 가능
+| 메시지 타입 | 용도 | 주요 필드 |
+|-------------|------|-----------|
+| `action` | 사용자 상호작용 전달 | `name`, `surfaceId`, `sourceComponentId`, `timestamp`, `context` |
+| `dataModelChanged` | 데이터 변경 전송 | `surfaceId`, `actorId`, `updates`, `versions` |
+| `error` | 클라이언트 오류 보고 | `code`, `surfaceId`, `path`, `message` |
 
 ---
 
-## 6. 데이터 바인딩 시스템
+## 5. Surface 개념
 
-### JSON Pointer (RFC 6901)
+### Surface란?
 
-A2UI는 데이터 접근에 **JSON Pointer** 표준을 사용합니다:
+**Surface**는 독립적으로 관리되는 UI 영역입니다. 각 Surface는 고유한 ID, 컴포넌트 트리, DataModel을 가집니다.
 
-```javascript
-// 데이터 모델
-const dataModel = {
-  user: {
-    name: "홍길동",
-    age: 30,
-    addresses: [
-      { city: "서울", zip: "12345" },
-      { city: "부산", zip: "67890" }
-    ]
-  },
-  products: [
-    { name: "쿠키", price: 5000 }
-  ]
-};
+```mermaid
+flowchart TB
+    subgraph App["Application"]
+        subgraph SA["Surface A: product-list"]
+            SA_Tree["컴포넌트 트리"]
+            SA_Data["DataModel: {products:[...]}"]
+        end
 
-// JSON Pointer 경로 예시
-"/user/name"              → "홍길동"
-"/user/age"               → 30
-"/user/addresses/0/city"  → "서울"
-"/user/addresses/1/zip"   → "67890"
-"/products/0/price"       → 5000
+        subgraph SB["Surface B: shopping-cart"]
+            SB_Tree["컴포넌트 트리"]
+            SB_Data["DataModel: {items:[...]}"]
+        end
+
+        subgraph SC["Surface C: user-profile"]
+            SC_Tree["컴포넌트 트리"]
+            SC_Data["DataModel: {user:{...}}"]
+        end
+    end
 ```
+
+### Surface 특성
+
+| 특성 | 설명 |
+|------|------|
+| 고유 ID | 각 Surface는 `surfaceId`로 식별 |
+| 독립적 트리 | 독자적인 컴포넌트 트리 보유 |
+| 독립적 데이터 | 독자적인 DataModel 보유 |
+| 개별 관리 | 생성/업데이트/삭제 개별 처리 |
+| Root 컴포넌트 | 반드시 `id: "root"` 컴포넌트 필요 |
+
+---
+
+## 6. 컴포넌트 모델 (v0.9)
+
+### Adjacency List 패턴
+
+v0.9 스펙은 **평탄한 배열**로 트리를 표현합니다 (중첩 대신 ID 참조):
+
+```json
+{
+  "components": [
+    { "id": "root", "component": "Column", "children": ["text1", "text2"] },
+    { "id": "text1", "component": "Text", "text": "Hello" },
+    { "id": "text2", "component": "Text", "text": "World" }
+  ]
+}
+```
+
+### 컴포넌트 구조
+
+| 필드 | 설명 | 필수 |
+|------|------|------|
+| `id` | 고유 식별자 | ✅ |
+| `component` | 타입 (Text, Button 등) | ✅ |
+| `children` | 자식 컴포넌트 ID 배열 | 선택 |
+| `weight` | Flex-grow 값 (Row/Column 내) | 선택 |
+| 타입별 속성 | `text`, `url`, `action` 등 | 타입별 |
+
+### Adjacency List의 장점
+
+| 장점 | 설명 |
+|------|------|
+| LLM 친화적 | 깊은 중첩 없이 생성 용이 |
+| 개별 업데이트 | 특정 컴포넌트만 수정 가능 |
+| 재사용 | ID 참조로 컴포넌트 재사용 |
+| 지연 해석 | 순서 무관하게 컴포넌트 정의 |
+
+---
+
+## 7. 데이터 바인딩 시스템 (v0.9)
+
+### Path Resolution
+
+v0.9 스펙은 두 가지 스코프를 정의합니다:
+
+| 스코프 | 경로 형식 | 설명 |
+|--------|-----------|------|
+| **Root Scope** | `/user/name` (절대 경로) | DataModel 루트에서 해석 |
+| **Collection Scope** | `firstName` (상대 경로) | List 템플릿 내 현재 아이템 기준 |
 
 ### 문자열 보간 (Interpolation)
 
-`${/path}` 구문으로 데이터를 텍스트에 삽입:
+`${...}` 구문으로 동적 값 삽입:
 
-```json
-// A2UI 컴포넌트 정의
-{
-  "type": "Text",
-  "text": "${/user/name}님, 총 ${/cart/total}원입니다."
-}
-
-// dataModel = { user: { name: "홍길동" }, cart: { total: 15000 } }
-
-// 렌더링 결과
-"홍길동님, 총 15000원입니다."
-```
-
-### 양방향 바인딩
-
-입력 컴포넌트는 `dataPath`로 자동 동기화:
-
-```json
-{
-  "type": "TextField",
-  "label": "이름",
-  "dataPath": "/form/name"
-}
-```
-
-```
-사용자 입력: "김철수"
-     ↓
-dataModel.form.name = "김철수" (자동 업데이트)
-     ↓
-같은 dataPath를 참조하는 모든 컴포넌트 갱신
-```
-
-### List 템플릿과 컨텍스트 변수
-
-```json
-{
-  "type": "List",
-  "dataPath": "/products",      // 반복할 배열 경로
-  "itemTemplateId": "card"      // 템플릿 컴포넌트 ID
-}
-```
-
-템플릿 내에서 사용 가능한 특수 변수:
-
-| 변수 | 설명 | 예시 |
+| 구문 | 설명 | 예시 |
 |------|------|------|
-| `${item}` | 현재 아이템 전체 | 객체 자체 |
-| `${item.xxx}` | 현재 아이템의 속성 | `${item.name}` |
-| `${index}` | 현재 인덱스 (0부터) | 0, 1, 2, ... |
+| `${/path}` | 절대 경로 참조 | `${/user/name}` |
+| `${path}` | 상대 경로 참조 (컬렉션 내) | `${firstName}` |
+| `${func()}` | 클라이언트 함수 호출 | `${formatDate()}` |
+| 중첩 | 함수 내 경로 | `${formatDate(${/date}, 'yyyy-MM-dd')}` |
+
+### JSON Pointer 예시
+
+```javascript
+// DataModel
+{
+  user: {
+    name: "홍길동",
+    addresses: [
+      { city: "서울", zip: "12345" }
+    ]
+  }
+}
+
+// JSON Pointer 경로
+"/user/name"              → "홍길동"
+"/user/addresses/0/city"  → "서울"
+```
+
+### 양방향 바인딩 (Two-Way Binding)
+
+입력 컴포넌트(TextField, CheckBox 등)는 양방향 바인딩 지원:
+
+```mermaid
+flowchart LR
+    DataModel["DataModel"]
+    Component["입력 컴포넌트"]
+
+    DataModel -->|"Read: 값 표시"| Component
+    Component -->|"Write: 로컬 업데이트"| DataModel
+    Component -.->|"Sync: Action 통해 서버 전송"| Server["Server"]
+```
+
+| 동작 | 설명 |
+|------|------|
+| Read | 컴포넌트가 DataModel 값 표시 |
+| Write | 사용자 입력 시 로컬 DataModel 즉시 업데이트 |
+| Sync | 서버 업데이트는 명시적 Action으로만 발생 |
 
 ---
 
-## 7. 표준 컴포넌트 (18개)
+## 8. 표준 컴포넌트 (v0.9)
 
-A2UI v0.9 스펙에 정의된 표준 컴포넌트:
-
-### 레이아웃 (5개)
+### 레이아웃
 
 | 컴포넌트 | 설명 | 주요 속성 |
 |----------|------|-----------|
-| **Row** | 가로 배치 | `childIds`, `gap`, `justifyContent`, `alignItems` |
-| **Column** | 세로 배치 | `childIds`, `gap`, `alignItems` |
-| **List** | 반복 렌더링 | `dataPath`, `itemTemplateId`, `emptyText` |
-| **Card** | 카드 컨테이너 | `title`, `subtitle`, `elevation`, `childIds` |
-| **Tabs** | 탭 네비게이션 | `tabs`, `activeTab` |
+| **Row** | 가로 배치 | `children`, `gap`, `justifyContent`, `alignItems` |
+| **Column** | 세로 배치 | `children`, `gap`, `alignItems` |
+| **List** | 템플릿 반복 렌더링 | `children.template`, `dataBinding` |
+| **Card** | 스타일된 컨테이너 | `title`, `subtitle`, `elevation` |
+| **Tabs** | 탭 인터페이스 | `tabs`, `activeTab` |
+| **Modal** | 오버레이 다이얼로그 | |
 
-### 표시 (5개)
+### 표시
 
 | 컴포넌트 | 설명 | 주요 속성 |
 |----------|------|-----------|
-| **Text** | 텍스트 | `text`, `variant`, `color`, `fontWeight` |
-| **Image** | 이미지 | `src`, `alt`, `width`, `height`, `objectFit` |
+| **Text** | 텍스트 (마크다운 지원) | `text`, `usageHint` (h1, h2, body 등) |
+| **Image** | 이미지 | `url`, `alt`, `width`, `height` |
 | **Icon** | 아이콘 | `name`, `size`, `color` |
-| **Video** | 비디오 | `src`, `poster`, `autoplay`, `controls` |
-| **Divider** | 구분선 | `orientation`, `color`, `thickness` |
+| **Video** | 비디오 | `url`, `poster`, `autoplay`, `controls` |
+| **AudioPlayer** | 오디오 플레이어 | `url`, `controls` |
+| **Divider** | 구분선 | `orientation`, `color` |
 
-### 입력 (5개)
+### 입력
 
 | 컴포넌트 | 설명 | 주요 속성 |
 |----------|------|-----------|
-| **Button** | 버튼 | `label`, `variant`, `action`, `disabled` |
-| **TextField** | 텍스트 입력 | `label`, `dataPath`, `placeholder`, `multiline` |
-| **CheckBox** | 체크박스 | `label`, `dataPath`, `disabled` |
-| **DateTimeInput** | 날짜/시간 | `label`, `dataPath`, `mode` |
-| **Slider** | 슬라이더 | `label`, `dataPath`, `min`, `max`, `step` |
+| **Button** | 버튼 | `label`, `action`, `disabled` |
+| **TextField** | 텍스트 입력 | `label`, `dataBinding`, `placeholder` |
+| **CheckBox** | 체크박스 | `label`, `dataBinding` |
+| **ChoicePicker** | 선택 (단일/다중) | `options`, `mode` |
+| **DateTimeInput** | 날짜/시간 | `mode` (date/time/datetime) |
+| **Slider** | 슬라이더 | `min`, `max`, `step` |
 
 ---
 
-## 8. Action 시스템
+## 9. Action 시스템 (v0.9)
 
-### 사용자 상호작용 처리
+### Action 메시지 구조
 
-버튼 클릭 등 사용자 상호작용은 **Action**으로 AI에게 전달됩니다:
+사용자 상호작용은 `action` 메시지로 서버에 전달됩니다:
+
+| 필드 | 설명 |
+|------|------|
+| `name` | 액션 식별자 (예: "submitOrder") |
+| `surfaceId` | 액션이 발생한 Surface |
+| `sourceComponentId` | 트리거한 컴포넌트 ID |
+| `timestamp` | ISO 8601 타임스탬프 |
+| `context` | 액션별 추가 데이터 |
+
+### Action 흐름
+
+```mermaid
+sequenceDiagram
+    participant User as 사용자
+    participant Button as Button 컴포넌트
+    participant Renderer as A2UI 렌더러
+    participant Server as App Server
+    participant AI as AI (LLM)
+
+    User->>Button: 클릭
+    Button->>Renderer: Action 트리거
+    Renderer->>Server: action 메시지 전송
+    Note over Server: { name, surfaceId, context, timestamp }
+    Server->>AI: Action 포함 프롬프트
+    AI->>Server: 새 A2UI JSON
+    Server->>Renderer: UI 업데이트
+```
+
+### 버튼 Action 정의 예시
 
 ```json
-// 버튼 정의
 {
-  "type": "Button",
+  "id": "order-btn",
+  "component": "Button",
   "label": "주문하기",
   "action": {
-    "type": "sendAction",
-    "actionId": "submitOrder",
-    "payload": {
-      "productId": "${item.id}",
-      "quantity": 1
-    }
+    "name": "submitOrder",
+    "context": [
+      { "key": "productId", "value": { "path": "id" } },
+      { "key": "quantity", "value": { "literalNumber": 1 } }
+    ]
   }
 }
 ```
 
-```
-사용자가 버튼 클릭
-       ↓
-Action 객체 생성
-{
-  "actionId": "submitOrder",
-  "surfaceId": "main",
-  "componentId": "order-btn",
-  "payload": { "productId": "cookie-001", "quantity": 1 },
-  "dataModel": { ... 현재 폼 데이터 ... }
-}
-       ↓
-AI에게 전달 (컨텍스트로)
-       ↓
-AI가 새로운 A2UI JSON 생성
-```
-
-### Action의 구성 요소
-
-| 필드 | 설명 |
-|------|------|
-| `actionId` | 액션 식별자 (예: "submitOrder", "selectProduct") |
-| `surfaceId` | 액션이 발생한 Surface |
-| `componentId` | 액션을 트리거한 컴포넌트 ID |
-| `payload` | 추가 데이터 (보간된 값 포함) |
-| `dataModel` | 현재 Surface의 전체 데이터 스냅샷 |
-
 ---
 
-## 9. 실제 활용 사례
-
-### Use Case 1: AI 쇼핑 어시스턴트
-
-```
-사용자: "가방 추천해줘"
-AI: (상품 카드 리스트 UI 생성)
-
-사용자: [상품 클릭]
-AI: (상세 정보 + 옵션 선택 UI 생성)
-
-사용자: [장바구니 담기]
-AI: (장바구니 UI 생성 + 결제 유도)
-```
-
-### Use Case 2: 폼 빌더
-
-```
-사용자: "회원가입 폼 만들어줘"
-AI: (이름, 이메일, 비밀번호 필드 UI 생성)
-
-사용자: "전화번호 필드도 추가해줘"
-AI: (기존 UI에 전화번호 필드 추가)
-```
-
-### Use Case 3: 대시보드 생성
-
-```
-사용자: "이번 달 매출 보여줘"
-AI: (차트 + 요약 카드 UI 생성)
-
-사용자: "지난 달이랑 비교해줘"
-AI: (비교 차트 UI로 업데이트)
-```
-
-### Use Case 4: 고객 지원 봇
-
-```
-사용자: "주문 취소하고 싶어요"
-AI: (주문 목록 UI 생성)
-
-사용자: [주문 선택]
-AI: (취소 확인 폼 UI 생성)
-
-사용자: [확인]
-AI: (취소 완료 메시지 UI)
-```
-
----
-
-## 10. MVP 구현 사례: Enhans 마켓플레이스
+## 10. MVP 구현 사례: Dubai Market
 
 ### 프로젝트 구조
 
 ```
-a2ui-learning/
+dubai-market/
 ├── app/
 │   ├── api/chat/route.ts     # OpenAI API + 시스템 프롬프트
 │   ├── page.tsx              # 채팅 UI
@@ -639,55 +419,43 @@ a2ui-learning/
 
 ### 핵심 모듈 역할
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         모듈 역할 분리                                   │
-├──────────────────┬──────────────────────────────────────────────────────┤
-│ parser.ts        │ AI 응답에서 A2UI JSON 추출 및 유효성 검증            │
-│                  │ - JSONL 파싱                                         │
-│                  │ - 메시지 타입 검증                                   │
-│                  │ - 구분자 기반 파싱                                   │
-├──────────────────┼──────────────────────────────────────────────────────┤
-│ interpolation.ts │ 저수준 데이터 유틸리티                               │
-│                  │ - JSON Pointer 경로 해석 (get/set)                   │
-│                  │ - 문자열 보간 (${/path} → 실제값)                    │
-│                  │ - 단일 객체 조작                                     │
-├──────────────────┼──────────────────────────────────────────────────────┤
-│ data-model.ts    │ 고수준 상태 관리                                     │
-│                  │ - Surface별 DataModel 관리                           │
-│                  │ - 상태 업데이트/삭제                                 │
-│                  │ - interpolation.ts 내부 사용                         │
-├──────────────────┼──────────────────────────────────────────────────────┤
-│ A2UIRenderer.tsx │ React 렌더링 엔진                                    │
-│                  │ - Surface → React 컴포넌트 변환                      │
-│                  │ - 컴포넌트 트리 순회                                 │
-│                  │ - Action/DataChange 이벤트 처리                      │
-└──────────────────┴──────────────────────────────────────────────────────┘
-```
+| 모듈 | 역할 |
+|------|------|
+| `parser.ts` | AI 응답에서 A2UI JSON 추출, JSONL 파싱, 메시지 검증 |
+| `interpolation.ts` | JSON Pointer 해석, 문자열 보간 (`${/path}` → 값) |
+| `data-model.ts` | Surface별 DataModel 관리, 상태 업데이트 |
+| `A2UIRenderer.tsx` | Surface → React 컴포넌트 변환, Action 처리 |
+| `ComponentRenderer.tsx` | 컴포넌트 타입별 디스패치 |
+
+### 구현된 컴포넌트
+
+| 카테고리 | 컴포넌트 |
+|----------|----------|
+| 레이아웃 | Column, Row, Card, List |
+| 표시 | Text, Image, Divider |
+| 입력 | Button, TextField, CheckBox |
 
 ### 데모: 두바이 쫀득 쿠키 주문 플로우
 
-**Step 1**: 상품 목록
-```
-사용자: "두바이 쫀득 쿠키 보여줘"
-→ AI가 상품 카드 리스트 A2UI 생성
-→ List + Card + Image + Text + Button 조합
-```
+```mermaid
+sequenceDiagram
+    participant User as 사용자
+    participant AI as AI
+    participant UI as A2UI 렌더러
 
-**Step 2**: 결제 정보
-```
-사용자: [상품 선택 버튼 클릭]
-→ Action { actionId: "selectProduct", payload: { productId: "..." } }
-→ AI가 주문 폼 A2UI 생성
-→ TextField (이름, 연락처, 주소) + Button
-```
+    User->>AI: "두바이 쫀득 쿠키 보여줘"
+    AI->>UI: 상품 카드 리스트 JSON
+    UI->>User: 상품 목록 UI 표시
 
-**Step 3**: 주문 완료
-```
-사용자: [주문하기 버튼 클릭]
-→ Action { actionId: "submitOrder", dataModel: { form: {...} } }
-→ AI가 완료 화면 A2UI 생성
-→ 주문번호 + 주문 정보 요약
+    User->>UI: [상품 선택 클릭]
+    UI->>AI: Action: selectProduct
+    AI->>UI: 주문 폼 JSON
+    UI->>User: 주문 폼 UI 표시
+
+    User->>UI: [주문하기 클릭]
+    UI->>AI: Action: submitOrder + form data
+    AI->>UI: 완료 화면 JSON
+    UI->>User: 주문 완료 UI 표시
 ```
 
 ---
@@ -696,19 +464,12 @@ a2ui-learning/
 
 ### 효과적인 프롬프트 구성
 
-```
-1. JSON Schema 제공
-   → AI가 정확한 구조로 JSON 생성하도록 유도
-
-2. 컴포넌트 카탈로그
-   → 사용 가능한 컴포넌트와 속성 명세
-
-3. UI 템플릿 예시
-   → 각 시나리오별 완전한 JSON 예시
-
-4. 응답 형식 지정
-   → 텍스트와 JSON 분리 규칙
-```
+| 요소 | 설명 |
+|------|------|
+| JSON Schema | AI가 정확한 구조로 JSON 생성하도록 유도 |
+| 컴포넌트 카탈로그 | 사용 가능한 컴포넌트와 속성 명세 |
+| UI 템플릿 예시 | 시나리오별 완전한 JSON 예시 |
+| 응답 형식 | 텍스트와 JSON 분리 규칙 (구분자 사용) |
 
 ### 구분자 기반 응답
 
@@ -736,43 +497,37 @@ a2ui-learning/
 | 렌더러 구현 비용 | 각 플랫폼별 렌더러 개발 필요 |
 | LLM 의존성 | AI 응답 품질에 따라 UI 품질 변동 |
 
-### 도입 시 고려사항
+### 도입 가이드
 
-```
-✅ A2UI가 적합한 경우
-─────────────────────
-• AI 에이전트가 동적 UI를 생성해야 할 때
-• 보안이 중요한 환경
-• 다중 플랫폼 지원이 필요할 때
-• 채팅 기반 인터페이스
-
-❌ A2UI가 부적합한 경우
-─────────────────────
-• 고정된 UI만 필요한 경우 (오버엔지니어링)
-• 매우 복잡한 커스텀 UI가 필요한 경우
-• 실시간 고성능이 필요한 경우 (게임 등)
-```
+| A2UI가 적합한 경우 | A2UI가 부적합한 경우 |
+|-------------------|---------------------|
+| AI 에이전트가 동적 UI 생성 필요 | 고정된 UI만 필요 (오버엔지니어링) |
+| 보안이 중요한 환경 | 매우 복잡한 커스텀 UI 필요 |
+| 다중 플랫폼 지원 필요 | 실시간 고성능 필요 (게임 등) |
+| 채팅 기반 인터페이스 | |
 
 ---
 
 ## 13. 참고 자료
 
 ### 공식 자료
-- [A2UI 공식 사이트](https://a2ui.org/)
-- [A2UI GitHub](https://github.com/google/A2UI)
-- [A2UI v0.9 스펙](https://a2ui.org/specification/v0.9-a2ui/)
+
+| 자료 | 링크 |
+|------|------|
+| A2UI 공식 사이트 | [https://a2ui.org/](https://a2ui.org/) |
+| A2UI GitHub | [https://github.com/google/A2UI](https://github.com/google/A2UI) |
+| A2UI v0.9 스펙 | [https://a2ui.org/specification/v0.9-a2ui/](https://a2ui.org/specification/v0.9-a2ui/) |
 
 ### 관련 표준
-- [JSON Pointer (RFC 6901)](https://tools.ietf.org/html/rfc6901)
-- [JSON Schema](https://json-schema.org/)
 
-### 관련 기술
-- [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
-- [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+| 표준 | 링크 |
+|------|------|
+| JSON Pointer (RFC 6901) | [https://tools.ietf.org/html/rfc6901](https://tools.ietf.org/html/rfc6901) |
+| JSON Schema | [https://json-schema.org/](https://json-schema.org/) |
 
 ---
 
-## 부록: 기술 스택
+## 부록: MVP 기술 스택
 
 | 영역 | 기술 |
 |------|------|
@@ -784,6 +539,6 @@ a2ui-learning/
 
 ---
 
-*이 문서는 a2ui-learning 프로젝트의 MVP 구현 경험을 바탕으로 작성되었습니다.*
+*이 문서는 [A2UI v0.9 Specification](https://a2ui.org/specification/v0.9-a2ui/)을 기반으로 작성되었습니다.*
 
-*작성일: 2025년 1월*
+*Dubai Market MVP 구현 경험 포함 | 작성일: 2025년 1월*
